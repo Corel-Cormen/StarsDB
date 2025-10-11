@@ -129,7 +129,7 @@ class HtmlExtractor(ContentExtractorInterface):
 
         planetDict["Distance_from_the_star"] = self.__serializeFiled(textHtml, "Distance from the star", "AU")
         planetDict["Orbit_around_star"] = self.__serializeFiled(textHtml, "Orbit around star", "days")
-        planetDict["Eccentricity"] = self.__serializeFiled(textHtml, "Eccentricity")
+        planetDict["Eccentricity"] = self.__serializeFiled(textHtml, "Eccentricity", "Basic characteristic")
 
         planetDict["Mass"] = self.__serializeFiled(textHtml, "Mass", "M")
         planetDict["Size"] = self.__serializeFiled(textHtml, "Size", "R")
@@ -221,8 +221,8 @@ class HtmlExtractor(ContentExtractorInterface):
             habitabilityHtml = html[3].get_text(" ", strip=False)
             habitability = self.__serializeFiled(habitabilityHtml, "Habitable zone of the star", "AU")
             habitabilityField = habitability.split('-')
-            habitabilityMin = habitabilityField[0]
-            habitabilityMax = habitabilityField[1]
+            habitabilityMin = habitabilityField[0].strip()
+            habitabilityMax = habitabilityField[1].strip()
 
         return (habitabilityMin, habitabilityMax)
 

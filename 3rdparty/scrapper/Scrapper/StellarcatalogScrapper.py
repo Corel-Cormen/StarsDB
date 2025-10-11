@@ -96,11 +96,10 @@ class StellarcatalogScrapper(ScrapperInterface):
                         locationStruct = self.__createLocalization(location)
                         starStructList = self.__createStars(stars, planetDict)
 
-                        system = DH.StarSystem(
-                            systemName,
-                            locationStruct,
-                            starStructList,
-                        )
+                        system = DH.StarSystem(systemName,
+                                               locationStruct,
+                                               starStructList,
+                                               )
                         dataHolder.starSystemList.append(system)
                     else:
                         print("Detect star system without location")

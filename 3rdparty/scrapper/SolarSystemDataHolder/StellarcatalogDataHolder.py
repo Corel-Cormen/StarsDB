@@ -71,7 +71,7 @@ class StellarcatalogDataHolder(DataHolderInterface):
         parsed = minidom.parseString(xml_str)
         pretty_xml = parsed.toprettyxml(indent="\t")
 
-        fileName = datetime.now().strftime("SrapData_%Y_%m_%d_%H_%M_%S.xml")
+        fileName = datetime.now().strftime("ScrapData_%Y_%m_%d_%H_%M_%S.xml")
         with open(fileName, "w", encoding="utf-8") as f:
             f.write(pretty_xml)
             print(f"Data save to {fileName} finsih")

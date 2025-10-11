@@ -16,6 +16,8 @@ class WebRequester(WebRequesterInterface):
             try:
                 response = requests.get(url)
                 break
+            except KeyboardInterrupt:
+                raise
             except:
                 print("Request timeout")
                 reqDebouncing += 1

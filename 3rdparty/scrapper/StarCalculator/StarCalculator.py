@@ -1,3 +1,4 @@
+import math
 import re
 from astropy.coordinates import SkyCoord
 from astropy import units as u
@@ -25,6 +26,16 @@ def covertDMS(dec) -> float:
         raise ValueError(f"Incorrect format Dec: {dec}")
     d, m, s = map(float, match.groups())
     sign = 1 if d >= 0 else -1
-    if (-90.0 > d) or (d > 90.0):
-        d = d%90
-    return sign * (abs(d) + m / 60 + s / 3600)
+    dms = sign * (abs(d) + m / 60 + s / 3600)
+    if __less(dms, -90.0) or __greater(dms, 90.0):
+        dms = dms%90
+    return dms
+
+def __close(a: float, b: float, rel_tol: float = 1e-9, abs_tol: float = 0.0) -> bool:
+    return math.isclose(a, b, rel_tol=rel_tol, abs_tol=abs_tol)
+
+def __greater(a: float, b: float, rel_tol: float = 1e-9, abs_tol: float = 0.0) -> bool:
+    return (not __close(a, b, rel_tol, abs_tol)) and (a > b)
+
+def __less(a: float, b: float, rel_tol: float = 1e-9, abs_tol: float = 0.0) -> bool:
+    return (not __close(a, b, rel_tol, abs_tol)) and (a < b)

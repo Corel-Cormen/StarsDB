@@ -1,9 +1,28 @@
-import Platform.StellarcatalogPlatformInstance as Instance
+import argparse
 
+import Platform
+
+
+def chcekGeneratorFlag() -> bool:
+    parser = argparse.ArgumentParser(description="Scrapper runner")
+    parser.add_argument(
+        "-g", "--genData",
+        action="store_true",
+        help="Enable generate data mode"
+    )
+    args = parser.parse_args()
+    return args.genData
 
 def main():
-    scrapper = Instance.GetScrapperInstance()
-    dataHolder = Instance.GetSolarSystemDataHolderInstance()
+
+    if chcekGeneratorFlag():
+        print("Run scrapper in generate data mode.")
+        platformInstance = Platform.loadPlatform("GereratorPlatformInstance")
+    else:
+        platformInstance = Platform.loadPlatform("StellarcatalogPlatformInstance")
+
+    scrapper = platformInstance.GetScrapperInstance()
+    dataHolder = platformInstance.GetSolarSystemDataHolderInstance()
 
     if scrapper.scrap(dataHolder):
         dataHolder.saveToFile()

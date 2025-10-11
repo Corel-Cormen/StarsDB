@@ -1,4 +1,4 @@
-## Opis projektu
+## Opis skryptu
 
 *Scrapper* to narzędzie służące do automatycznego pozyskiwania i przetwarzania danych astronomicznych z wybranych stron internetowych.
 
@@ -9,24 +9,43 @@ Efektem działania aplikacji jest plik XML zawierający kompletne informacje o u
 
 ```mermaid
 sequenceDiagram
-    autonumber
     participant User as Użytkownik
     participant Scrapper as Program Scrapper
     participant Website as Strona internetowa
 
     User->>Scrapper: Uruchamia proces pobierania danych
     Scrapper->>Website: Żądanie HTTP
-    Website->>Scrapper: Odpowiedź w formacie HTML
+    Website-->>Scrapper: Odpowiedź w formacie HTML
     Scrapper->>Scrapper: Walidacja struktury HTML
-    Scrapper-->>Scrapper: Wyodrębinianie danych o gwiazdach i planetach
+    Scrapper->>Scrapper: Wyodrębinianie danych o gwiazdach i planetach
     Scrapper->>Scrapper: Konwertuje dane do struktury XML
     Scrapper-->>User: Zapisuje i zwraca gotowy plik XML
 ```
 
 ## Uruchomienie
+
 ```sh
-python3 -m commands.main
+python3 -m commands.main [-g, --genData]
 ```
+
+&emsp;Argumenty:
+- [-g, --genData]: skrypt przechodzi w tryb losowego generowania danych.
+
+Do edycji struktury danych używany jest plik .genCfg w formacie JSON. Przykładowa konfiguracja:
+
+```json
+{
+    "SystemQuantity": 10,
+    "MaxStarQuantity": 3,
+    "MaxPlanetQuantity": 8
+}
+```
+
+| Nazwa | Typ  | Opis |
+| :-----|:----:| :----|
+| SystemQuantity | int  | Liczba generowanych systemów gwiezdnych. |
+| MaxStarQuantity | int  | Maksymalna liczba gwiazd w systemie (zakres: [1, wartość]). |
+| MaxPlanetQuantity | int  | Maksymalna liczba planet dla pojedynczej gwiazdy (zakres: [0, wartość]) |
 
 ## Dokumentacja pliku XML
 
