@@ -19,7 +19,7 @@ class GeneratorScrapper(ScrapperInterface):
 
     def scrap(self, dataHolder: DH.DataHolderInterface) -> bool:
         result = True
-        if os.path.isfile(".genCfg"):
+        if os.path.isfile(".genCfg.json"):
             print("Detect generate config file.")
             cfg = self.__loadCfg()
 
