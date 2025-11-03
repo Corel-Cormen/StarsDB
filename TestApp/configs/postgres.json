@@ -1,0 +1,9 @@
+{
+  "type": "postgresql",
+  "host": "localhost",
+  "port": 5432,
+  "user": "admin",
+  "password": "admin123",
+  "database": "star_db",
+  "container_name": "postgres_db"
+}

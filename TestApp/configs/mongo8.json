@@ -1,0 +1,10 @@
+{
+  "type": "mongo",
+  "host": "localhost",
+  "port": 27018,
+  "user": "admin",
+  "password": "admin123",
+  "uri": "mongodb://admin:admin123@localhost:27018/",
+  "database": "star_db",
+  "container_name": "mongo8_db"
+}
