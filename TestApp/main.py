@@ -12,7 +12,7 @@ from tests.plot_result import plot_last_run
 CONFIG_DIR = Path(__file__).parent / "configs"
 TESTS_MODULE = "tests"
 
-RECORD_SIZES = [10000]
+RECORD_SIZES = [100]
 REPEATS = 1
 TESTS = [
     ("insert", "insert_test", "insert_runner"),
@@ -115,7 +115,7 @@ def run_for_config(conf_path, run_id):
     except Exception as e:
         print(f"Warning: could not close connection: {e}")
 
-    print(f"✅ Finished tests for {db_label} ({db_type})")
+    print(f"Finished tests for {db_label} ({db_type})")
 
 
 if __name__ == "__main__":
@@ -124,5 +124,5 @@ if __name__ == "__main__":
     for conf_file in CONFIG_DIR.glob("*.json"):
         run_for_config(conf_file, global_run_id)
 
-    print("\nAll done ✅")
+    print("\nAll done")
     plot_last_run()

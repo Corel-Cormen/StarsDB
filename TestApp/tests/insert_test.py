@@ -11,7 +11,7 @@ def insert_and_get_id(cur, query, params, db_type):
     if db_type == "postgresql":
         cur.execute(query + " RETURNING id;", params)
         return cur.fetchone()[0]
-    else:  # MySQL, SQLite, itp.
+    else:
         cur.execute(query + ";", params)
         return cur.lastrowid
 
@@ -56,19 +56,15 @@ def create_fake_star_data():
         ],
     }
 
-
-def insert_star_with_planets(cur, star_data, db_type):
-    # 1. Constellation
+def insert_star_with_planets(cur, star_data, db_type, cache):
     constellation_id = insert_and_get_id(
         cur, "INSERT INTO Constellation (name) VALUES (%s)", (star_data["constellation"],), db_type
     )
 
-    # 2. Solar System
     system_id = insert_and_get_id(
         cur, "INSERT INTO SolarSystem (name) VALUES (%s)", (star_data["solar_system"],), db_type
     )
 
-    # 3. Location
     loc = star_data["location"]
     cur.execute(
         """
@@ -78,7 +74,6 @@ def insert_star_with_planets(cur, star_data, db_type):
         (system_id, loc["RightAscension"], loc["Declination"], loc["Parallax"], loc["SunDistance"], constellation_id),
     )
 
-    # 4. Star + details
     s = star_data["star"]
     star_id = insert_and_get_id(
         cur, "INSERT INTO Star (name, id_system) VALUES (%s, %s)", (s["name"], system_id), db_type
@@ -104,13 +99,19 @@ def insert_star_with_planets(cur, star_data, db_type):
         db_type,
     )
 
-    type_id = insert_and_get_id(
-        cur, "INSERT INTO StarType (TypeName) VALUES (%s)", (s["StarType"],), db_type
-    )
+    stype = s["StarType"]
+    if stype not in cache["star_types"]:
+        cache["star_types"][stype] = insert_and_get_id(
+            cur, "INSERT INTO StarType (TypeName) VALUES (%s)", (stype,), db_type
+        )
+    type_id = cache["star_types"][stype]
 
-    subtype_id = insert_and_get_id(
-        cur, "INSERT INTO StarSubtype (TypeName) VALUES (%s)", (s["StarSubType"],), db_type
-    )
+    ssub = s["StarSubType"]
+    if ssub not in cache["star_subtypes"]:
+        cache["star_subtypes"][ssub] = insert_and_get_id(
+            cur, "INSERT INTO StarSubtype (TypeName) VALUES (%s)", (ssub,), db_type
+        )
+    subtype_id = cache["star_subtypes"][ssub]
 
     details_id = insert_and_get_id(
         cur,
@@ -130,54 +131,80 @@ def insert_star_with_planets(cur, star_data, db_type):
         (details_id, subtype_id),
     )
 
-    # 5. Planets
+    planet_char_values = []
+    planet_values = []
+
     for p in star_data["planets"]:
-        ptype_id = insert_and_get_id(
-            cur, "INSERT INTO PlanetType (TypeName) VALUES (%s)", (p["PlanetType"],), db_type
-        )
+        ptype = p["PlanetType"]
+        if ptype not in cache["planet_types"]:
+            cache["planet_types"][ptype] = insert_and_get_id(
+                cur, "INSERT INTO PlanetType (TypeName) VALUES (%s)", (ptype,), db_type
+            )
+        ptype_id = cache["planet_types"][ptype]
 
-        psubtype_id = insert_and_get_id(
-            cur, "INSERT INTO PlanetSubtype (TypeName) VALUES (%s)", (p["PlanetSubtype"],), db_type
-        )
+        psub = p["PlanetSubtype"]
+        if psub not in cache["planet_subtypes"]:
+            cache["planet_subtypes"][psub] = insert_and_get_id(
+                cur, "INSERT INTO PlanetSubtype (TypeName) VALUES (%s)", (psub,), db_type
+            )
+        psubtype_id = cache["planet_subtypes"][psub]
 
-        pchar_id = insert_and_get_id(
-            cur,
+        planet_char_values.append((
+            p["DistanseFromStar"], p["OrbitAroundStar"], p["Eccentricity"],
+            p["Mass"], p["Size"], p["Density"], p["YearDiscover"], False
+        ))
+        planet_values.append((p["name"], ptype_id, psubtype_id))
+
+    if db_type == "postgresql":
+        cur.execute(
+            """
+            INSERT INTO PlanetCharacteristic (DistanceFromStar, OrbitAroundStar, Eccentricity, Mass, Size, Density, YearDiscover, HabitabilityZone)
+            VALUES """ + ",".join(["(%s,%s,%s,%s,%s,%s,%s,%s)" for _ in planet_char_values]) + " RETURNING id;",
+            [val for row in planet_char_values for val in row]
+        )
+        new_ids = [row[0] for row in cur.fetchall()]
+    else:
+        cur.executemany(
             """
             INSERT INTO PlanetCharacteristic (DistanceFromStar, OrbitAroundStar, Eccentricity, Mass, Size, Density, YearDiscover, HabitabilityZone)
             VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
             """,
-            (
-                p["DistanseFromStar"],
-                p["OrbitAroundStar"],
-                p["Eccentricity"],
-                p["Mass"],
-                p["Size"],
-                p["Density"],
-                p["YearDiscover"],
-                False,
-            ),
-            db_type,
+            planet_char_values
         )
+        first_id = cur.lastrowid
+        new_ids = list(range(first_id, first_id + len(planet_values)))
 
-        cur.execute(
-            """
-            INSERT INTO Planet (name, id_type, id_subtype, id_characteristic, id_star)
-            VALUES (%s,%s,%s,%s,%s);
-            """,
-            (p["name"], ptype_id, psubtype_id, pchar_id, star_id),
-        )
+    planet_rows = [
+        (name, ptype_id, psubtype_id, char_id, star_id)
+        for (name, ptype_id, psubtype_id), char_id in zip(planet_values, new_ids)
+    ]
+    cur.executemany(
+        """
+        INSERT INTO Planet (name, id_type, id_subtype, id_characteristic, id_star)
+        VALUES (%s,%s,%s,%s,%s)
+        """,
+        planet_rows
+    )
 
 def insert_runner(conn, db_type, target_name, n_records):
     cur = conn.cursor()
     conn.autocommit = False
 
+    cache = {
+        "star_types": {},
+        "star_subtypes": {},
+        "planet_types": {},
+        "planet_subtypes": {}
+    }
+
     all_data = [create_fake_star_data() for _ in range(n_records)]
 
     def db_operations():
         for star_data in all_data:
-            insert_star_with_planets(cur, star_data, db_type)
+            insert_star_with_planets(cur, star_data, db_type, cache)
         conn.commit()
 
     res = measure(db_operations, repeats=1)
     cur.close()
     return res
+

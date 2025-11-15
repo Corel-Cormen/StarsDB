@@ -1,51 +1,87 @@
 import random
 from .common import measure
 
-def delete_random_star(cur, db_type):
-    order_func = "RANDOM()" if db_type == "postgresql" else "RAND()"
-    cur.execute(f"SELECT id FROM Star ORDER BY {order_func} LIMIT 1;")
-    row = cur.fetchone()
-    if not row:
-        return
-    star_id = row[0]
+def delete_batch_stars(cur, star_ids, db_type):
+    ids_str = ','.join(['%s'] * len(star_ids))
 
-    cur.execute("SELECT id, id_characteristic FROM Planet WHERE id_star = %s;", (star_id,))
-    planets = cur.fetchall()
-    for p_id, p_char_id in planets:
-        cur.execute("DELETE FROM Planet WHERE id = %s;", (p_id,))
-        cur.execute("DELETE FROM PlanetCharacteristic WHERE id = %s;", (p_char_id,))
+    if db_type == "postgresql":
+        cur.execute(f"DELETE FROM Planet WHERE id_star IN ({ids_str});", star_ids)
 
-    cur.execute("""
-        SELECT sd.id, sd.id_characteristic, sd.id_photometry
-        FROM StarDetails sd
-        JOIN StarSubtypeDetails ssd ON sd.id = ssd.star_details_id
-        LIMIT 1;
-    """)
-    sd_row = cur.fetchone()
-    sd_id = char_id = phot_id = None
-    if sd_row:
-        sd_id, char_id, phot_id = sd_row
+        cur.execute(f"""
+            DELETE FROM PlanetCharacteristic pc
+            USING Planet p
+            WHERE pc.id = p.id_characteristic AND p.id_star IN ({ids_str});
+        """, star_ids)
 
-    if sd_id:
-        cur.execute("DELETE FROM StarSubtypeDetails WHERE star_details_id = %s;", (sd_id,))
-        cur.execute("DELETE FROM StarDetails WHERE id = %s;", (sd_id,))
-    if char_id:
-        cur.execute("DELETE FROM StarCharacteristic WHERE id = %s;", (char_id,))
-    if phot_id:
-        cur.execute("DELETE FROM StarPhotometry WHERE id = %s;", (phot_id,))
+        cur.execute(f"""
+            DELETE FROM StarSubtypeDetails ssd
+            USING StarDetails sd
+            WHERE ssd.star_details_id = sd.id AND sd.id_characteristic IN ({ids_str});
+        """, star_ids)
 
-    cur.execute("DELETE FROM Star WHERE id = %s;", (star_id,))
+        cur.execute(f"DELETE FROM StarDetails WHERE id_characteristic IN ({ids_str});", star_ids)
 
-def delete_runner(conn, db_type, target_name, n_records):
+        cur.execute(f"""
+            DELETE FROM StarPhotometry sp
+            USING StarDetails sd
+            WHERE sp.id = sd.id_photometry AND sd.id_characteristic IN ({ids_str});
+        """, star_ids)
+
+        cur.execute(f"""
+            DELETE FROM StarCharacteristic sc
+            WHERE sc.id IN ({ids_str});
+        """, star_ids)
+
+        cur.execute(f"DELETE FROM Star WHERE id IN ({ids_str});", star_ids)
+
+    else:
+        cur.execute(f"""
+            DELETE ssd FROM StarSubtypeDetails ssd
+            JOIN StarDetails sd ON ssd.star_details_id = sd.id
+            WHERE sd.id_characteristic IN ({ids_str});
+        """, star_ids)
+
+        cur.execute(f"DELETE FROM StarDetails WHERE id_characteristic IN ({ids_str});", star_ids)
+
+        cur.execute(f"""
+            DELETE sp FROM StarPhotometry sp
+            JOIN StarDetails sd ON sp.id = sd.id_photometry
+            WHERE sd.id_characteristic IN ({ids_str});
+        """, star_ids)
+
+        cur.execute(f"""
+            DELETE sc FROM StarCharacteristic sc
+            WHERE sc.id IN ({ids_str});
+        """, star_ids)
+
+        cur.execute(f"DELETE FROM Planet WHERE id_star IN ({ids_str});", star_ids)
+
+        cur.execute(f"""
+            DELETE pc FROM PlanetCharacteristic pc
+            JOIN Planet p ON pc.id = p.id_characteristic
+            WHERE p.id_star IN ({ids_str});
+        """, star_ids)
+
+        cur.execute(f"DELETE FROM Star WHERE id IN ({ids_str});", star_ids)
+
+
+def delete_runner(conn, db_type, target_name, n_records, batch_size=100):
     cur = conn.cursor()
     conn.autocommit = False
 
+    cur.execute("SELECT id FROM Star;")
+    all_ids = [row[0] for row in cur.fetchall()]
+
     def db_operations():
-        for _ in range(n_records):
-            delete_random_star(cur, db_type)
+        remaining = n_records
+        while remaining > 0:
+            current_batch = min(batch_size, remaining)
+            star_ids = random.sample(all_ids, current_batch)
+            delete_batch_stars(cur, star_ids, db_type)
+            remaining -= current_batch
+
         conn.commit()
 
     res = measure(db_operations, repeats=1)
-
     cur.close()
     return res
