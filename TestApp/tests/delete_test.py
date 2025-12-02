@@ -1,67 +1,67 @@
 import random
 from .common import measure
 
+
 def delete_batch_stars(cur, star_ids, db_type):
     ids_str = ','.join(['%s'] * len(star_ids))
 
     if db_type == "postgresql":
-        cur.execute(f"DELETE FROM Planet WHERE id_star IN ({ids_str});", star_ids)
 
         cur.execute(f"""
-            DELETE FROM PlanetCharacteristic pc
-            USING Planet p
-            WHERE pc.id = p.id_characteristic AND p.id_star IN ({ids_str});
+            WITH deleted_planets AS (
+                DELETE FROM Planet 
+                WHERE id_star IN ({ids_str})
+                RETURNING id_characteristic
+            )
+            DELETE FROM PlanetCharacteristic 
+            WHERE id IN (SELECT id_characteristic FROM deleted_planets);
         """, star_ids)
 
         cur.execute(f"""
-            DELETE FROM StarSubtypeDetails ssd
-            USING StarDetails sd
-            WHERE ssd.star_details_id = sd.id AND sd.id_characteristic IN ({ids_str});
-        """, star_ids)
-
-        cur.execute(f"DELETE FROM StarDetails WHERE id_characteristic IN ({ids_str});", star_ids)
-
-        cur.execute(f"""
-            DELETE FROM StarPhotometry sp
-            USING StarDetails sd
-            WHERE sp.id = sd.id_photometry AND sd.id_characteristic IN ({ids_str});
+            DELETE FROM StarSubtypeDetails 
+            WHERE star_details_id IN (
+                SELECT id FROM StarDetails WHERE id_characteristic IN ({ids_str})
+            );
         """, star_ids)
 
         cur.execute(f"""
-            DELETE FROM StarCharacteristic sc
-            WHERE sc.id IN ({ids_str});
+            WITH deleted_details AS (
+                DELETE FROM StarDetails 
+                WHERE id_characteristic IN ({ids_str})
+                RETURNING id_photometry
+            )
+            DELETE FROM StarPhotometry 
+            WHERE id IN (SELECT id_photometry FROM deleted_details);
         """, star_ids)
 
+        cur.execute(f"DELETE FROM StarCharacteristic WHERE id IN ({ids_str});", star_ids)
         cur.execute(f"DELETE FROM Star WHERE id IN ({ids_str});", star_ids)
 
     else:
-        cur.execute(f"""
-            DELETE ssd FROM StarSubtypeDetails ssd
-            JOIN StarDetails sd ON ssd.star_details_id = sd.id
-            WHERE sd.id_characteristic IN ({ids_str});
-        """, star_ids)
 
-        cur.execute(f"DELETE FROM StarDetails WHERE id_characteristic IN ({ids_str});", star_ids)
+        cur.execute(f"SELECT id_characteristic FROM Planet WHERE id_star IN ({ids_str})", star_ids)
+        planet_char_rows = cur.fetchall()
+        planet_char_ids = [str(r[0]) for r in planet_char_rows if r[0] is not None]
 
-        cur.execute(f"""
-            DELETE sp FROM StarPhotometry sp
-            JOIN StarDetails sd ON sp.id = sd.id_photometry
-            WHERE sd.id_characteristic IN ({ids_str});
-        """, star_ids)
+        cur.execute(f"SELECT id, id_photometry FROM StarDetails WHERE id_characteristic IN ({ids_str})", star_ids)
+        details_rows = cur.fetchall()
+        details_ids = [str(r[0]) for r in details_rows]
+        photometry_ids = [str(r[1]) for r in details_rows if r[1] is not None]
 
-        cur.execute(f"""
-            DELETE sc FROM StarCharacteristic sc
-            WHERE sc.id IN ({ids_str});
-        """, star_ids)
+        if details_ids:
+            cur.execute(f"DELETE FROM StarSubtypeDetails WHERE star_details_id IN ({','.join(details_ids)})")
 
         cur.execute(f"DELETE FROM Planet WHERE id_star IN ({ids_str});", star_ids)
 
-        cur.execute(f"""
-            DELETE pc FROM PlanetCharacteristic pc
-            JOIN Planet p ON pc.id = p.id_characteristic
-            WHERE p.id_star IN ({ids_str});
-        """, star_ids)
+        if planet_char_ids:
+            cur.execute(f"DELETE FROM PlanetCharacteristic WHERE id IN ({','.join(planet_char_ids)})")
 
+        cur.execute(f"DELETE FROM StarDetails WHERE id_characteristic IN ({ids_str});", star_ids)
+
+        if photometry_ids:
+            cur.execute(f"DELETE FROM StarPhotometry WHERE id IN ({','.join(photometry_ids)})")
+
+        cur.execute(f"DELETE FROM StarCharacteristic WHERE id IN ({ids_str});", star_ids)
         cur.execute(f"DELETE FROM Star WHERE id IN ({ids_str});", star_ids)
 
 
@@ -74,11 +74,23 @@ def delete_runner(conn, db_type, target_name, n_records, batch_size=100):
 
     def db_operations():
         remaining = n_records
-        while remaining > 0:
-            current_batch = min(batch_size, remaining)
-            star_ids = random.sample(all_ids, current_batch)
+        ids_to_process = list(all_ids)
+
+        while remaining > 0 and ids_to_process:
+            current_batch_size = min(batch_size, remaining)
+
+            if len(ids_to_process) < current_batch_size:
+                star_ids = ids_to_process
+                ids_to_process = []
+            else:
+                star_ids = ids_to_process[:current_batch_size]
+                ids_to_process = ids_to_process[current_batch_size:]
+
+            if not star_ids:
+                break
+
             delete_batch_stars(cur, star_ids, db_type)
-            remaining -= current_batch
+            remaining -= len(star_ids)
 
         conn.commit()
 

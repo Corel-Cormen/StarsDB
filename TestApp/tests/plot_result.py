@@ -4,6 +4,7 @@ import os
 
 RESULTS_CSV = os.path.join(os.path.dirname(__file__), "..", "results", "benchmark_results.csv")
 
+
 def plot_last_run():
     df = pd.read_csv(RESULTS_CSV)
     if df.empty:
@@ -29,7 +30,14 @@ def plot_last_run():
     )
 
     operations = ['insert', 'select', 'update', 'delete']
-    colors = {'postgresql': 'blue', 'mysql': 'orange', 'mongo': 'gray'}
+
+    colors = {
+        'postgresql': 'blue',
+        'mysql': 'orange',
+        'mongo': 'gray',
+        'mongo6': 'gray',
+        'mongo8': 'gray'
+    }
 
     fig, axes = plt.subplots(1, 4, figsize=(20, 5))
 
@@ -37,19 +45,44 @@ def plot_last_run():
         ax = axes[i]
         df_op = df_last[df_last['operation'] == op]
 
+        if df_op.empty:
+            ax.set_title(op.upper())
+            continue
+
         bases = df_op['label'].unique()
         means = [df_op[df_op['label'] == b]['avg_s'].mean() for b in bases]
 
-        colors_list = [colors.get(b.split()[0].split('(')[0], 'gray') for b in bases]
+        colors_list = [colors.get(b, 'gray') for b in bases]
 
-        ax.bar(bases, means, color=colors_list)
+        bars = ax.bar(bases, means, color=colors_list)
         ax.set_title(op.upper())
         ax.set_ylabel("Time [s]")
         ax.set_xlabel("Database")
         ax.grid(axis='y', linestyle='--', alpha=0.7)
 
+        if means:
+            max_height = max(means)
+
+            limit_buffer = max_height * 0.15 if max_height > 0 else 1.0
+            ax.set_ylim(0, max_height + limit_buffer)
+
+            offset = max_height * 0.01
+        else:
+            offset = 0.01
+
         for j, v in enumerate(means):
-            ax.text(j, v + 0.01, f"{v:.2f}s", ha='center', va='bottom')
+            text_label = f"{v:.4f}s" if v < 0.01 else f"{v:.2f}s"
+
+            ax.text(
+                j,
+                v + offset,
+                text_label,
+                ha='center',
+                va='bottom',
+                fontsize=9,
+                fontweight='bold'
+            )
+        # -----------------------------
 
     fig.suptitle(f"{records_label}", fontsize=14, y=1)
 
