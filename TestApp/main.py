@@ -12,7 +12,7 @@ from tests.plot_result import plot_last_run
 CONFIG_DIR = Path(__file__).parent / "configs"
 TESTS_MODULE = "tests"
 
-RECORD_SIZES = [10]
+RECORD_SIZES = [1000000]
 REPEATS = 1
 TESTS = [
     ("insert", "insert_test", "insert_runner"),
@@ -111,7 +111,10 @@ def run_for_config(conf_path, run_id):
             write_result_csv(row)
 
     try:
-        client.close()
+        if db_type == "mongo":
+            client.client.close()
+        else:
+            client.close()
     except Exception as e:
         print(f"Warning: could not close connection: {e}")
 
