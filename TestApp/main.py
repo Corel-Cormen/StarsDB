@@ -12,7 +12,7 @@ from tests.plot_result import plot_last_run
 CONFIG_DIR = Path(__file__).parent / "configs"
 TESTS_MODULE = "tests"
 
-RECORD_SIZES = [100]
+RECORD_SIZES = [10]
 REPEATS = 1
 TESTS = [
     ("insert", "insert_test", "insert_runner"),

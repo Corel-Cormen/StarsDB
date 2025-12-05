@@ -84,7 +84,7 @@ def plot_last_run():
             )
         # -----------------------------
 
-    fig.suptitle(f"{records_label}", fontsize=14, y=1)
+    fig.suptitle(f"{records_label}", fontsize=14, y=0.98)
 
     plt.tight_layout()
     plt.show()
